@@ -6,6 +6,7 @@ import stripe
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from shop.models.order import BaseOrder, OrderModel, OrderPayment
 from shop.payment.base import PaymentProvider
@@ -23,7 +24,11 @@ class StripePayment(PaymentProvider):
         From the given request, add a snippet to the page.
         """
         try:
+            stripe.api_key = settings.SHOP_STRIPE['APIKEY']
+            stripe.api_version = settings.SHOP_STRIPE_API_VERSION
+
             self.charge(cart, request)
+            self.subscribe(cart, request)
             thank_you_url = OrderModel.objects.get_latest_url()
             js_expression = '$window.location.href="{}";'.format(thank_you_url)
             return js_expression
@@ -36,7 +41,6 @@ class StripePayment(PaymentProvider):
         This view is invoked by the Javascript function `scope.charge()` delivered
         by `get_payment_request`.
         """
-        stripe.api_key = settings.SHOP_STRIPE['APIKEY']
         token_id = cart.extra['payment_extra_data']['token_id']
         charge = stripe.Charge.create(
             amount=cart.total.as_integer(),
@@ -51,6 +55,19 @@ class StripePayment(PaymentProvider):
         else:
             msg = "Stripe returned status '{status}' for id: {id}"
             raise stripe.error.InvalidRequestError(msg.format(**charge))
+
+    def subscribe(self, cart, request):
+        """
+        Create a new customer and subscribe the customer
+        to the default payment plan.
+        """
+        user_id = cart.customer.user_id;
+        user = User.objects.get(id=user_id)
+
+        customer = stripe.Customer.create(email=user.email)
+
+        customer.subscriptions.create(
+            plan=settings.DEFAULT_PAYMENT_PLAN)
 
 
 class OrderWorkflowMixin(object):
