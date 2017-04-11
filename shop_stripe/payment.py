@@ -4,13 +4,14 @@ from __future__ import unicode_literals
 from decimal import Decimal
 import stripe
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from shop.models.order import BaseOrder, OrderModel, OrderPayment
 from shop.payment.base import PaymentProvider
 from django_fsm import transition
+from models import StripeCustomer
 
 
 class StripePayment(PaymentProvider):
@@ -23,10 +24,10 @@ class StripePayment(PaymentProvider):
         """
         From the given request, add a snippet to the page.
         """
-        try:
-            stripe.api_key = settings.SHOP_STRIPE['APIKEY']
-            stripe.api_version = settings.SHOP_STRIPE_API_VERSION
+        stripe.api_key = settings.SHOP_STRIPE['APIKEY']
+        stripe.api_version = settings.SHOP_STRIPE_API_VERSION
 
+        try:
             self.charge(cart, request)
             self.subscribe(cart, request)
             thank_you_url = OrderModel.objects.get_latest_url()
@@ -64,9 +65,21 @@ class StripePayment(PaymentProvider):
         user_id = cart.customer.user_id;
         user = User.objects.get(id=user_id)
 
-        customer = stripe.Customer.create(email=user.email)
+        try:
+            customer = StripeCustomer.objects.get(user_id=user_id)
+            stripe_customer = stripe.Customer.retrieve(customer.stripe_customer_id)
+        except ObjectDoesNotExist:
+            stripe_customer = stripe.Customer.create(
+                email=user.email,
+                description=u"{0}, {1}".format(
+                    user.last_name,
+                    user.first_name))
 
-        customer.subscriptions.create(
+            StripeCustomer.objects.create(
+                user_id=user_id,
+                stripe_customer_id=stripe_customer.id)
+
+        stripe_customer.subscriptions.create(
             plan=settings.DEFAULT_PAYMENT_PLAN)
 
 
