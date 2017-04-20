@@ -25,7 +25,7 @@ class StripePayment(PaymentProvider):
         From the given request, add a snippet to the page.
         """
         stripe.api_key = settings.SHOP_STRIPE['APIKEY']
-        stripe.api_version = settings.SHOP_STRIPE_API_VERSION
+        stripe.api_version = settings.SHOP_STRIPE['API_VERSION']
 
         try:
             self.charge(cart, request)
