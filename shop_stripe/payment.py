@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from decimal import Decimal
 import stripe
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
@@ -68,7 +68,7 @@ class StripePayment(PaymentProvider):
         try:
             customer = StripeCustomer.objects.get(user_id=user_id)
             stripe_customer = stripe.Customer.retrieve(customer.stripe_customer_id)
-        except ObjectDoesNotExist:
+        except StripeCustomer.DoesNotExist:
             stripe_customer = stripe.Customer.create(
                 email=user.email,
                 description=u"{0}, {1}".format(
