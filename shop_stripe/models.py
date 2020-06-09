@@ -20,7 +20,8 @@ class StripeCustomer(models.Model):
         verbose_name = "Stripe Customer"
         verbose_name_plural = "Stripe Customers"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     stripe_customer_id = models.CharField(
         help_text="Stripe customer id.",
